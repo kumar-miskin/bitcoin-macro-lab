@@ -43,6 +43,8 @@ def align_and_measure(btc: pd.DataFrame, liquidity: pd.DataFrame, weeks: int = 1
     availability as observation date + lag unless the input has an ``available_at``
     column. Rolling changes are over ``weeks`` Friday rows.
     """
+    if not isinstance(weeks, int) or isinstance(weeks, bool) or weeks < 1:
+        raise ValueError("weeks must be a positive integer")
     weekly = _weekly_btc(btc).reset_index(names="week")
     lq = _liquidity_with_availability(liquidity, lag_days)
     aligned = pd.merge_asof(
@@ -50,9 +52,10 @@ def align_and_measure(btc: pd.DataFrame, liquidity: pd.DataFrame, weeks: int = 1
         left_on="btc_asof", right_on="liquidity_available_at", direction="backward",
     ).set_index("week")
     aligned.index.name = "date"
-    aligned = aligned.dropna(subset=["liquidity_index"])
-    aligned[f"btc_{weeks}w_return"] = aligned["btc_close"].pct_change(weeks)
-    aligned[f"liquidity_{weeks}w_change"] = aligned["liquidity_index"].pct_change(weeks)
+    # Keep unmatched Fridays until after changes are calculated. Dropping one here
+    # makes pct_change(weeks) silently stretch over more than `weeks` weeks.
+    aligned[f"btc_{weeks}w_return"] = aligned["btc_close"].pct_change(weeks, fill_method=None)
+    aligned[f"liquidity_{weeks}w_change"] = aligned["liquidity_index"].pct_change(weeks, fill_method=None)
     return aligned.dropna(subset=[f"btc_{weeks}w_return", f"liquidity_{weeks}w_change"])
 
 
