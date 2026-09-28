@@ -14,7 +14,7 @@ pytest
 
 `btc_daily.csv` must contain `date,close`. `us_liquidity_weekly.csv` must contain `date,liquidity_index`. Raw inputs are kept outside the package so each analysis can pin its sources and as-of date. Never mix publication dates with observation dates without recording the lag.
 
-`us_liquidity_weekly.csv` may also contain `available_at` (UTC timestamp when the value was first published). When present it is used as-is; otherwise availability is `date + --lag-days`.
+`us_liquidity_weekly.csv` may also contain `available_at` (UTC timestamp when the value was first published). When present it is used as-is; otherwise availability is `date + --lag-days`. Duplicate availability timestamps are rejected instead of arbitrarily choosing a revision; record vintages and select one observation per release time upstream. Duplicate BTC dates and null timestamps are also rejected. A missing liquidity value remains missing and does not forward-fill across its release.
 
 ## Point-in-time alignment
 
