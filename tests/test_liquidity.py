@@ -121,3 +121,29 @@ def test_null_macro_release_cannot_bridge_a_gap_in_weekly_return():
     assert pd.Timestamp("2025-01-31", tz="UTC") not in got.index
     assert pd.Timestamp("2025-02-07", tz="UTC") in got.index
     assert got.loc[pd.Timestamp("2025-02-07", tz="UTC"), "liquidity_2w_change"] == pytest.approx(125/115-1)
+
+
+def test_duplicate_release_timestamp_cannot_select_arbitrary_revision():
+    btc = pd.DataFrame({'date':['2025-01-03','2025-01-10'], 'close':[100,110]})
+    liq = pd.DataFrame({'date':['2025-01-01','2025-01-08','2025-01-08'],
+                        'available_at':['2025-01-02T21:30Z','2025-01-09T21:30Z','2025-01-09T21:30Z'],
+                        'liquidity_index':[100,120,900]})
+    with pytest.raises(ValueError,match='duplicate.*availability'):
+        align_and_measure(btc,liq,weeks=1)
+
+
+def test_later_null_release_does_not_shadow_valid_earlier_value():
+    btc = pd.DataFrame({'date':['2025-01-03','2025-01-10','2025-01-17'], 'close':[100,110,120]})
+    liq = pd.DataFrame({'date':['2025-01-01','2025-01-08'],
+                        'liquidity_index':[100,float('nan')]})
+    # A missing value stays unknown; it never becomes an earlier known value.
+    got = align_and_measure(btc,liq,weeks=1)
+    assert pd.Timestamp('2025-01-10',tz='UTC') not in got.index
+    assert pd.Timestamp('2025-01-17',tz='UTC') not in got.index
+
+
+def test_duplicate_daily_price_timestamp_is_rejected():
+    btc = pd.DataFrame({'date':['2025-01-03','2025-01-03','2025-01-10'], 'close':[100,999,110]})
+    liq = pd.DataFrame({'date':['2025-01-01'], 'liquidity_index':[100]})
+    with pytest.raises(ValueError,match='duplicate.*BTC'):
+        align_and_measure(btc,liq,weeks=1)

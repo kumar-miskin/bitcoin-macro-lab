@@ -15,7 +15,13 @@ DEFAULT_LAGS = (0, 1, 2, 7, 14)
 
 
 def _weekly_btc(btc: pd.DataFrame) -> pd.DataFrame:
+    if btc.empty:
+        raise ValueError("BTC data is empty")
     b = btc.assign(date=pd.to_datetime(btc["date"], utc=True)).set_index("date")["close"].sort_index()
+    if b.index.has_duplicates:
+        raise ValueError("duplicate BTC dates: one daily close per UTC day is required")
+    if b.isna().any() or (b <= 0).any():
+        raise ValueError("BTC closes must be positive and non-null")
     weekly = b.resample("W-FRI").last().dropna().rename("btc_close").to_frame()
     # A daily close labelled D is only known at the end of D (00:00 UTC on D+1).
     weekly["btc_asof"] = weekly.index + pd.Timedelta(days=1)
@@ -23,6 +29,8 @@ def _weekly_btc(btc: pd.DataFrame) -> pd.DataFrame:
 
 
 def _liquidity_with_availability(liquidity: pd.DataFrame, lag_days: float) -> pd.DataFrame:
+    if liquidity.empty:
+        raise ValueError("liquidity data is empty")
     l = liquidity.copy()
     l["liquidity_observed_at"] = pd.to_datetime(l["date"], utc=True)
     if "available_at" in l.columns:
@@ -30,6 +38,10 @@ def _liquidity_with_availability(liquidity: pd.DataFrame, lag_days: float) -> pd
         l["liquidity_available_at"] = pd.to_datetime(l["available_at"], utc=True)
     else:
         l["liquidity_available_at"] = l["liquidity_observed_at"] + pd.Timedelta(days=lag_days)
+    if l["liquidity_observed_at"].isna().any() or l["liquidity_available_at"].isna().any():
+        raise ValueError("liquidity observation and availability timestamps must be non-null")
+    if l["liquidity_available_at"].duplicated().any():
+        raise ValueError("duplicate liquidity availability timestamp: pick a documented vintage")
     if (l["liquidity_available_at"] < l["liquidity_observed_at"]).any():
         raise ValueError("available_at earlier than observation date")
     return l[["liquidity_observed_at", "liquidity_available_at", "liquidity_index"]].sort_values("liquidity_available_at")
