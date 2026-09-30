@@ -18,6 +18,8 @@ pytest
 
 ## Point-in-time alignment
 
+Only an actual Friday observation is used as the Friday BTC close. If it is missing, an earlier daily close is not substituted; the missing Friday remains on the weekly grid until changes are computed. An incomplete final week cannot create a future Friday close.
+
 Each Friday BTC close is treated as known at 00:00 UTC the following day. It is paired with the latest liquidity observation whose `available_at` is at or before that moment (a backward as-of join), so a release published after the close can never be used for it. `aligned.csv` keeps `liquidity_observed_at` and `liquidity_available_at` on every row. The calculation retains every Friday until after the N-week changes are computed. Rows without available liquidity and changes across an unavailable or null release are excluded only afterward, so an N-week change never silently stretches across more than N calendar weeks. `aligned.csv` therefore contains only rows with valid paired N-week changes and may have gaps, while `btc_asof` and both liquidity timestamps let readers inspect each surviving pair.
 
 `lag_sensitivity.csv` and `lag_sensitivity.png` report the correlation and sample size for each lag in `--lag-grid` (default 0, 1, 2, 7, 14 days). If the relationship only looks strong at lag 0, it probably depends on data that was not yet public.

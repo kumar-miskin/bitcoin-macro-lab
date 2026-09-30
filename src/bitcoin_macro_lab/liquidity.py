@@ -22,7 +22,10 @@ def _weekly_btc(btc: pd.DataFrame) -> pd.DataFrame:
         raise ValueError("duplicate BTC dates: one daily close per UTC day is required")
     if b.isna().any() or (b <= 0).any():
         raise ValueError("BTC closes must be positive and non-null")
-    weekly = b.resample("W-FRI").last().dropna().rename("btc_close").to_frame()
+    # Preserve missing Fridays instead of substituting an earlier close.
+    # The full calendar grid keeps N-week changes from bridging missing rows.
+    fridays = b.resample("W-FRI").last().index
+    weekly = b.reindex(fridays).rename("btc_close").to_frame()
     # A daily close labelled D is only known at the end of D (00:00 UTC on D+1).
     weekly["btc_asof"] = weekly.index + pd.Timedelta(days=1)
     return weekly

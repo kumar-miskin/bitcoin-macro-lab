@@ -147,3 +147,31 @@ def test_duplicate_daily_price_timestamp_is_rejected():
     liq = pd.DataFrame({'date':['2025-01-01'], 'liquidity_index':[100]})
     with pytest.raises(ValueError,match='duplicate.*BTC'):
         align_and_measure(btc,liq,weeks=1)
+
+
+def test_missing_friday_cannot_use_thursday_or_bridge_return():
+    btc = pd.DataFrame({"date": ["2025-01-03", "2025-01-09", "2025-01-17", "2025-01-24"],
+                        "close": [100., 999., 120., 132.]})
+    liq = pd.DataFrame({"date": ["2025-01-01"], "liquidity_index": [100.]})
+    got = align_and_measure(btc, liq, weeks=1)
+    assert got.index.tolist() == [pd.Timestamp("2025-01-24", tz="UTC")]
+    assert got.iloc[0]["btc_1w_return"] == pytest.approx(.1)
+
+
+def test_missing_friday_preserves_multiweek_calendar_grid():
+    btc = pd.DataFrame({"date": ["2025-01-03", "2025-01-09", "2025-01-17", "2025-01-24", "2025-01-31"],
+                        "close": [100., 999., 120., 132., 144.]})
+    liq = pd.DataFrame({"date": ["2025-01-01"], "liquidity_index": [100.]})
+    got = align_and_measure(btc, liq, weeks=2)
+    assert got.index.tolist() == [pd.Timestamp("2025-01-17", tz="UTC"),
+                                pd.Timestamp("2025-01-31", tz="UTC")]
+    assert got.iloc[0]["btc_2w_return"] == pytest.approx(.2)
+    assert got.iloc[1]["btc_2w_return"] == pytest.approx(.2)
+
+
+def test_incomplete_final_week_does_not_fabricate_future_friday():
+    btc = pd.DataFrame({"date": ["2025-01-03", "2025-01-10", "2025-01-13"], "close": [100., 110., 999.]})
+    liq = pd.DataFrame({"date": ["2025-01-01"], "liquidity_index": [100.]})
+    got = align_and_measure(btc, liq, weeks=1)
+    assert got.index.tolist() == [pd.Timestamp("2025-01-10", tz="UTC")]
+    assert got.iloc[0]["btc_1w_return"] == pytest.approx(.1)
